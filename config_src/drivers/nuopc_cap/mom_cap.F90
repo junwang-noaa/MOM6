@@ -147,6 +147,7 @@ logical :: cesm_coupled = .false.
 type(ESMF_GeomType_Flag) :: geomtype
 #endif
 character(len=8) :: restart_mode = 'alarms'
+real(8) :: timers, timere
 
 contains
 
@@ -230,8 +231,10 @@ subroutine InitializeP0(gcomp, importState, exportState, clock, rc)
   integer                     :: iostat
   character(len=64)           :: value, logmsg
   character(len=*),parameter  :: subname='(MOM_cap:InitializeP0)'
+  real(8)                     :: MPI_Wtime, timeip0s
 
   rc = ESMF_SUCCESS
+  timeip0s = MPI_Wtime()
 
   ! Switch to IPDv03 by filtering all other phaseMap entries
   call NUOPC_CompFilterPhaseMap(gcomp, ESMF_METHOD_INITIALIZE, &
@@ -363,6 +366,8 @@ subroutine InitializeP0(gcomp, importState, exportState, clock, rc)
     geomtype = ESMF_GEOMTYPE_GRID
   endif
 
+  if (is_root_pe()) write(stdout,*) 'In ', trim(subname),' time ',MPI_Wtime()-timeip0s
+
 end subroutine
 
 !> Called by NUOPC to advertise import and export fields.  "Advertise"
@@ -422,9 +427,11 @@ subroutine InitializeAdvertise(gcomp, importState, exportState, clock, rc)
                                                                  ! (same as restartfile if single restart file)
   character(len=*), parameter            :: subname='(MOM_cap:InitializeAdvertise)'
   character(len=32)                      :: calendar
+  real(8)                                :: MPI_Wtime, timeiads
 !--------------------------------
 
   rc = ESMF_SUCCESS
+  timeiads = MPI_Wtime()
 
   call ESMF_LogWrite(subname//' enter', ESMF_LOGMSG_INFO)
 
@@ -774,7 +781,8 @@ subroutine InitializeAdvertise(gcomp, importState, exportState, clock, rc)
     call NUOPC_Advertise(exportState, standardName=fldsFrOcn(n)%stdname, name=fldsFrOcn(n)%shortname, rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
   enddo
-  if(is_root_pe()) write(stdout,*) 'InitializeAdvertise complete'
+  if(is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', MPI_Wtime()-timeiads
+
 end subroutine InitializeAdvertise
 
 !> Called by NUOPC to realize import and export fields.  "Realizing" a field
@@ -856,9 +864,11 @@ subroutine InitializeRealize(gcomp, importState, exportState, clock, rc)
   real(ESMF_KIND_R8)                         :: min_areacor_glob(2)
   real(ESMF_KIND_R8)                         :: max_areacor_glob(2)
   character(len=*), parameter                :: subname='(MOM_cap:InitializeRealize)'
+  real(8)                                    :: MPI_Wtime, timeirls
   !--------------------------------
 
   rc = ESMF_SUCCESS
+  timeirls = MPI_Wtime()
 
   call shr_log_setLogUnit (stdout)
 
@@ -1350,6 +1360,8 @@ subroutine InitializeRealize(gcomp, importState, exportState, clock, rc)
   !     timeslice=1, relaxedFlag=.true., rc=rc)
   !if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
+  if(is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', MPI_Wtime()-timeirls
+
 end subroutine InitializeRealize
 
 !> TODO
@@ -1378,7 +1390,10 @@ subroutine DataInitialize(gcomp, rc)
   type(ESMF_Field)                       :: field
   character(len=64),allocatable          :: fieldNameList(:)
   character(len=*),parameter  :: subname='(MOM_cap:DataInitialize)'
+  real(8)                                :: MPI_Wtime, timedis
   !--------------------------------
+
+  timedis = MPI_Wtime()
 
   ! query the Component for its clock, importState and exportState
   call ESMF_GridCompGet(gcomp, clock=clock, importState=importState, exportState=exportState, rc=rc)
@@ -1440,6 +1455,10 @@ subroutine DataInitialize(gcomp, rc)
     enddo
   endif
 
+  timers = 0.
+  timere = 0.
+  if(is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', MPI_Wtime()-timedis
+
 end subroutine DataInitialize
 
 !> Called by NUOPC to advance the model a single timestep.
@@ -1490,9 +1509,13 @@ subroutine ModelAdvance(gcomp, rc)
   character(len=*),parameter             :: subname='(MOM_cap:ModelAdvance)'
   character(len=8)                       :: suffix
   integer                                :: num_rest_files
+  real(8)                                :: MPI_Wtime
 
   rc = ESMF_SUCCESS
   if(profile_memory) call ESMF_VMLogMemInfo("Entering MOM Model_ADVANCE: ")
+  timers = MPI_Wtime()
+  if(is_root_pe()) write(stdout,*) 'In MOM6, time since last time step ',timers-timere
+
 
   call shr_log_setLogUnit (stdout)
 
@@ -1726,6 +1749,9 @@ subroutine ModelAdvance(gcomp, rc)
     enddo
   endif
 
+  timere = MPI_Wtime()
+  if(is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', timere-timers
+
   if(profile_memory) call ESMF_VMLogMemInfo("Leaving MOM Model_ADVANCE: ")
 
 end subroutine ModelAdvance
@@ -1928,11 +1954,13 @@ subroutine ocean_model_finalize(gcomp, rc)
   character(len=64)                      :: timestamp
   logical                                :: write_restart
   character(len=*),parameter  :: subname='(MOM_cap:ocean_model_finalize)'
+  real(8)                                :: MPI_Wtime, timefs
 
   if (is_root_pe()) then
     write(stdout,*) 'MOM: --- finalize called ---'
   endif
   rc = ESMF_SUCCESS
+  timefs = MPI_Wtime()
 
   call ESMF_GridCompGetInternalState(gcomp, ocean_internalstate, rc)
   if (ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -1961,9 +1989,7 @@ subroutine ocean_model_finalize(gcomp, rc)
   call io_infra_end()
   call MOM_infra_end()
 
-  if (is_root_pe()) then
-    write(stdout,*) 'MOM: --- completed ---'
-  endif
+  if(is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', MPI_Wtime()-timefs
 
 end subroutine ocean_model_finalize
 
