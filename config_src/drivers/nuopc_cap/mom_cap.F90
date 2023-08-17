@@ -434,8 +434,6 @@ subroutine InitializeAdvertise(gcomp, importState, exportState, clock, rc)
   real(8)                                :: MPI_Wtime, timeiads
 !--------------------------------
 
-  print *,'in mom6, InitializeAdvertise'
-  print *,'in mom6, InitializeAdvertise, time=',MPI_Wtime()
   rc = ESMF_SUCCESS
   timeiads = MPI_Wtime()
 
@@ -1518,7 +1516,7 @@ subroutine ModelAdvance(gcomp, rc)
 
   rc = ESMF_SUCCESS
   if(profile_memory) call ESMF_VMLogMemInfo("Entering MOM Model_ADVANCE: ")
-  timers = MPI_Wtime()
+  if(timere > 0.) then timers = MPI_Wtime()
   if(is_root_pe()) write(*,*) 'In MOM6, time since last time step ',timers-timere
 
 
