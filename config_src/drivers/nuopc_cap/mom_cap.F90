@@ -1516,7 +1516,7 @@ subroutine ModelAdvance(gcomp, rc)
 
   rc = ESMF_SUCCESS
   if(profile_memory) call ESMF_VMLogMemInfo("Entering MOM Model_ADVANCE: ")
-  if(timere > 0.) then timers = MPI_Wtime()
+  if(timere > 0.) timers = MPI_Wtime()
   if(is_root_pe()) write(*,*) 'In MOM6, time since last time step ',timers-timere
 
 
