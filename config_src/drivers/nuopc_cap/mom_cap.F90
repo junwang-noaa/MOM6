@@ -233,10 +233,8 @@ subroutine InitializeP0(gcomp, importState, exportState, clock, rc)
   character(len=*),parameter  :: subname='(MOM_cap:InitializeP0)'
   type(ESMF_VM)               :: vm
   integer                     :: mype
-  real(8)                     :: MPI_Wtime, timeip0s
 
   rc = ESMF_SUCCESS
-  timeip0s = MPI_Wtime()
 
   ! Switch to IPDv03 by filtering all other phaseMap entries
   call NUOPC_CompFilterPhaseMap(gcomp, ESMF_METHOD_INITIALIZE, &
@@ -367,10 +365,6 @@ subroutine InitializeP0(gcomp, importState, exportState, clock, rc)
   else
     geomtype = ESMF_GEOMTYPE_GRID
   endif
-
-  call ESMF_GridCompGet(gcomp, vm=vm,rc=rc)
-  call ESMF_VMGet(vm, localpet=mype, rc=rc)
-  if (mype==0) write(*,*) 'In ', trim(subname),' time ',MPI_Wtime()-timeip0s
 
 end subroutine
 
@@ -785,7 +779,7 @@ subroutine InitializeAdvertise(gcomp, importState, exportState, clock, rc)
     call NUOPC_Advertise(exportState, standardName=fldsFrOcn(n)%stdname, name=fldsFrOcn(n)%shortname, rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
   enddo
-  if(is_root_pe()) write(*,*) 'In ',trim(subname),' time ', MPI_Wtime()-timeiads
+  if(is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', MPI_Wtime()-timeiads
 
 end subroutine InitializeAdvertise
 
@@ -1365,7 +1359,7 @@ subroutine InitializeRealize(gcomp, importState, exportState, clock, rc)
   !if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
   timere = 0.
-  if(is_root_pe()) write(*,*) 'In ',trim(subname),' time ', MPI_Wtime()-timeirls
+  if(is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', MPI_Wtime()-timeirls
 
 end subroutine InitializeRealize
 
@@ -1460,7 +1454,7 @@ subroutine DataInitialize(gcomp, rc)
     enddo
   endif
 
-  if(is_root_pe()) write(*,*) 'In ',trim(subname),' time ', MPI_Wtime()-timedis
+  if(is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', MPI_Wtime()-timedis
 
 end subroutine DataInitialize
 
@@ -1517,7 +1511,7 @@ subroutine ModelAdvance(gcomp, rc)
   rc = ESMF_SUCCESS
   if(profile_memory) call ESMF_VMLogMemInfo("Entering MOM Model_ADVANCE: ")
   if(timere > 0.) timers = MPI_Wtime()
-  if(is_root_pe()) write(*,*) 'In MOM6, time since last time step ',timers-timere
+  if(is_root_pe()) write(stdout,*) 'In MOM6, time since last time step ',timers-timere
 
 
   call shr_log_setLogUnit (stdout)
@@ -1753,7 +1747,7 @@ subroutine ModelAdvance(gcomp, rc)
   endif
 
   timere = MPI_Wtime()
-  if(is_root_pe()) write(*,*) 'In ',trim(subname),' time ', timere-timers
+  if(is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', timere-timers
 
   if(profile_memory) call ESMF_VMLogMemInfo("Leaving MOM Model_ADVANCE: ")
 
@@ -1992,7 +1986,7 @@ subroutine ocean_model_finalize(gcomp, rc)
   call io_infra_end()
   call MOM_infra_end()
 
-  if(is_root_pe()) write(*,*) 'In ',trim(subname),' time ', MPI_Wtime()-timefs
+  if(is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', MPI_Wtime()-timefs
 
 end subroutine ocean_model_finalize
 
