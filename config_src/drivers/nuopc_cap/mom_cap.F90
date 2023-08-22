@@ -127,6 +127,7 @@ integer              :: export_slice = 1
 character(len=256)   :: tmpstr
 logical              :: write_diagnostics = .false.
 logical              :: overwrite_timeslice = .false.
+logical              :: write_runtimelog = .false.
 character(len=32)    :: runtype  !< run type
 logical              :: profile_memory = .true.
 logical              :: grid_attach_area = .false.
@@ -249,6 +250,14 @@ subroutine InitializeP0(gcomp, importState, exportState, clock, rc)
 
   write(logmsg,*) write_diagnostics
   call ESMF_LogWrite('MOM_cap:DumpFields = '//trim(logmsg), ESMF_LOGMSG_INFO)
+
+  write_runtimelog = .false.
+  call NUOPC_CompAttributeGet(gcomp, name="RunTimeLog", value=value, &
+       isPresent=isPresent, isSet=isSet, rc=rc)
+  if (ChkErr(rc,__LINE__,u_FILE_u)) return
+  if (isPresent .and. isSet) write_runtimelog=(trim(value)=="true")
+  write(logmsg,*) write_runtimelog
+  call ESMF_LogWrite('MOM_cap:RunTimeLog = '//trim(logmsg), ESMF_LOGMSG_INFO)
 
   overwrite_timeslice = .false.
   call NUOPC_CompAttributeGet(gcomp, name="OverwriteSlice", value=value, &
@@ -429,7 +438,7 @@ subroutine InitializeAdvertise(gcomp, importState, exportState, clock, rc)
 !--------------------------------
 
   rc = ESMF_SUCCESS
-  timeiads = MPI_Wtime()
+  if(write_runtimelog) timeiads = MPI_Wtime()
 
   call ESMF_LogWrite(subname//' enter', ESMF_LOGMSG_INFO)
 
@@ -779,7 +788,7 @@ subroutine InitializeAdvertise(gcomp, importState, exportState, clock, rc)
     call NUOPC_Advertise(exportState, standardName=fldsFrOcn(n)%stdname, name=fldsFrOcn(n)%shortname, rc=rc)
     if (ChkErr(rc,__LINE__,u_FILE_u)) return
   enddo
-  if(is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', MPI_Wtime()-timeiads
+  if(write_runtimelog .and. is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', MPI_Wtime()-timeiads
 
 end subroutine InitializeAdvertise
 
@@ -866,7 +875,7 @@ subroutine InitializeRealize(gcomp, importState, exportState, clock, rc)
   !--------------------------------
 
   rc = ESMF_SUCCESS
-  timeirls = MPI_Wtime()
+  if(write_runtimelog) timeirls = MPI_Wtime()
 
   call shr_log_setLogUnit (stdout)
 
@@ -1359,7 +1368,7 @@ subroutine InitializeRealize(gcomp, importState, exportState, clock, rc)
   !if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
   timere = 0.
-  if(is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', MPI_Wtime()-timeirls
+  if(write_runtimelog .and. is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', MPI_Wtime()-timeirls
 
 end subroutine InitializeRealize
 
@@ -1392,7 +1401,7 @@ subroutine DataInitialize(gcomp, rc)
   real(8)                                :: MPI_Wtime, timedis
   !--------------------------------
 
-  timedis = MPI_Wtime()
+  if(write_runtimelog) timedis = MPI_Wtime()
 
   ! query the Component for its clock, importState and exportState
   call ESMF_GridCompGet(gcomp, clock=clock, importState=importState, exportState=exportState, rc=rc)
@@ -1454,7 +1463,7 @@ subroutine DataInitialize(gcomp, rc)
     enddo
   endif
 
-  if(is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', MPI_Wtime()-timedis
+  if(write_runtimelog .and. is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', MPI_Wtime()-timedis
 
 end subroutine DataInitialize
 
@@ -1510,8 +1519,10 @@ subroutine ModelAdvance(gcomp, rc)
 
   rc = ESMF_SUCCESS
   if(profile_memory) call ESMF_VMLogMemInfo("Entering MOM Model_ADVANCE: ")
-  timers = MPI_Wtime()
-  if(timere>0. .and. is_root_pe()) write(stdout,*) 'In MOM6, time since last time step ',timers-timere
+  if(write_runtimelog) then
+     timers = MPI_Wtime()
+     if(timere>0. .and. is_root_pe()) write(stdout,*) 'In ',trim(subname),' time since last time step ',timers-timere
+  endif
 
   call shr_log_setLogUnit (stdout)
 
@@ -1745,8 +1756,10 @@ subroutine ModelAdvance(gcomp, rc)
     enddo
   endif
 
-  timere = MPI_Wtime()
-  if(is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', timere-timers
+  if(write_runtimelog) then
+    timere = MPI_Wtime()
+    if(is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', timere-timers
+  endif
 
   if(profile_memory) call ESMF_VMLogMemInfo("Leaving MOM Model_ADVANCE: ")
 
@@ -1956,7 +1969,7 @@ subroutine ocean_model_finalize(gcomp, rc)
     write(stdout,*) 'MOM: --- finalize called ---'
   endif
   rc = ESMF_SUCCESS
-  timefs = MPI_Wtime()
+  if(write_runtimelog) timefs = MPI_Wtime()
 
   call ESMF_GridCompGetInternalState(gcomp, ocean_internalstate, rc)
   if (ChkErr(rc,__LINE__,u_FILE_u)) return
@@ -1985,7 +1998,7 @@ subroutine ocean_model_finalize(gcomp, rc)
   call io_infra_end()
   call MOM_infra_end()
 
-  if(is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', MPI_Wtime()-timefs
+  if(write_runtimelog .and. is_root_pe()) write(stdout,*) 'In ',trim(subname),' time ', MPI_Wtime()-timefs
 
 end subroutine ocean_model_finalize
 
